@@ -87,22 +87,3 @@ project/
 | POST | `/api/watchlist` | Add to watchlist |
 | DELETE | `/api/watchlist/{companyId}` | Remove from watchlist |
 
-## Astra / DevX Demo Ideas
-
-Use this codebase as input to demonstrate AI-assisted development:
-
-- Add PDF export for company reports
-- Add email alerts on rating changes
-- Integrate live market data API
-- Add role-based access (analyst vs viewer)
-- Build a 3-company comparison view
-
-## Demo Script (2 min)
-
-1. Login with demo credentials
-2. Show Dashboard — ratings, ESG, S&P 500 at a glance
-3. Search "Apple" in Company Explorer — view rating + ESG
-4. Open ESG Insights — sector filter + leaderboard
-5. Open Index Tracker — S&P 500 constituents
-6. Add a company to Watchlist
-7. Switch to Astra — "extend this app with feature X"
