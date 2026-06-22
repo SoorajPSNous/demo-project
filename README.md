@@ -1,6 +1,6 @@
 # MarketPulse — Intelligence Hub
 
-A full-stack financial intelligence demo application built for **S&P Global** client presentations and as a base input for **Astra/DevX**.
+A full-stack financial intelligence demo application built for client presentations.
 
 ## Stack
 
