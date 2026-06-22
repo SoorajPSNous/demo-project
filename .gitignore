@@ -1,0 +1,20 @@
+# .NET
+bin/
+obj/
+.vs/
+*.db
+*.db-shm
+*.db-wal
+**/Data/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
