@@ -1,0 +1,34 @@
+{
+  "trackerVersion": 1,
+  "updatedAt": "2026-06-23T03:52:26.450Z",
+  "tasks": {
+    "FEATURE-51448": {
+      "status": "PENDING",
+      "title": "Inventory Turn Analytics",
+      "featureId": 51448,
+      "slug": "inventory-turn-analytics",
+      "updatedAt": "2026-06-23T03:52:26.450Z"
+    },
+    "FEATURE-51447": {
+      "status": "PENDING",
+      "title": "Sales Pipeline Analytics",
+      "featureId": 51447,
+      "slug": "sales-pipeline-analytics",
+      "updatedAt": "2026-06-23T03:52:26.450Z"
+    },
+    "FEATURE-51449": {
+      "status": "PENDING",
+      "title": "Service Retention Analytics",
+      "featureId": 51449,
+      "slug": "service-retention-analytics",
+      "updatedAt": "2026-06-23T03:52:26.450Z"
+    },
+    "FEATURE-51450": {
+      "status": "PENDING",
+      "title": "Fleet Performance KPIs",
+      "featureId": 51450,
+      "slug": "fleet-performance-kpis",
+      "updatedAt": "2026-06-23T03:52:26.450Z"
+    }
+  }
+}
