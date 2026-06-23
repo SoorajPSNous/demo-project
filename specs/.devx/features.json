@@ -1,0 +1,148 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-06-23T03:52:26.449Z",
+  "enableTdd": false,
+  "totalFeatures": 4,
+  "features": [
+    {
+      "id": 51448,
+      "taskId": "FEATURE-51448",
+      "title": "Inventory Turn Analytics",
+      "slug": "inventory-turn-analytics",
+      "state": "planned",
+      "status": "not-started",
+      "storyCount": 3,
+      "totalStoryPoints": 12,
+      "files": {
+        "specs": "specs/inventory-turn-analytics/specs.md",
+        "requirements": "specs/inventory-turn-analytics/requirements.md",
+        "prompt": "specs/inventory-turn-analytics/prompt.md"
+      },
+      "userStories": [
+        {
+          "id": 51525,
+          "title": "As Inventory Controller, I want to perform inventory threshold alerts to achieve timely stock replenishment",
+          "state": "New",
+          "storyPoints": 4
+        },
+        {
+          "id": 51516,
+          "title": "As Inventory Analyst, I want to perform stock aging reports to achieve identification of slow-moving inventory",
+          "state": "New",
+          "storyPoints": 3
+        },
+        {
+          "id": 51507,
+          "title": "As Inventory Manager, I want to perform inventory turn rate tracking to achieve optimal stock levels",
+          "state": "New",
+          "storyPoints": 5
+        }
+      ]
+    },
+    {
+      "id": 51447,
+      "taskId": "FEATURE-51447",
+      "title": "Sales Pipeline Analytics",
+      "slug": "sales-pipeline-analytics",
+      "state": "planned",
+      "status": "not-started",
+      "storyCount": 3,
+      "totalStoryPoints": 16,
+      "files": {
+        "specs": "specs/sales-pipeline-analytics/specs.md",
+        "requirements": "specs/sales-pipeline-analytics/requirements.md",
+        "prompt": "specs/sales-pipeline-analytics/prompt.md"
+      },
+      "userStories": [
+        {
+          "id": 51498,
+          "title": "As Sales Director, I want to perform sales forecasting to achieve proactive revenue planning",
+          "state": "New",
+          "storyPoints": 8
+        },
+        {
+          "id": 51489,
+          "title": "As Sales Analyst, I want to perform conversion rate calculations to achieve measurement of sales effectiveness",
+          "state": "New",
+          "storyPoints": 3
+        },
+        {
+          "id": 51480,
+          "title": "As Sales Manager, I want to perform sales pipeline stage tracking to achieve visibility into deal progress",
+          "state": "New",
+          "storyPoints": 5
+        }
+      ]
+    },
+    {
+      "id": 51449,
+      "taskId": "FEATURE-51449",
+      "title": "Service Retention Analytics",
+      "slug": "service-retention-analytics",
+      "state": "planned",
+      "status": "not-started",
+      "storyCount": 3,
+      "totalStoryPoints": 15,
+      "files": {
+        "specs": "specs/service-retention-analytics/specs.md",
+        "requirements": "specs/service-retention-analytics/requirements.md",
+        "prompt": "specs/service-retention-analytics/prompt.md"
+      },
+      "userStories": [
+        {
+          "id": 51552,
+          "title": "As Service Director, I want to perform visualization of service retention trends to achieve insight-driven strategy development",
+          "state": "New",
+          "storyPoints": 6
+        },
+        {
+          "id": 51543,
+          "title": "As Customer Experience Analyst, I want to perform identification of customers with declining service frequency to achieve targeted outreach",
+          "state": "New",
+          "storyPoints": 4
+        },
+        {
+          "id": 51534,
+          "title": "As Service Manager, I want to perform service retention rate analysis to achieve increased repeat business",
+          "state": "New",
+          "storyPoints": 5
+        }
+      ]
+    },
+    {
+      "id": 51450,
+      "taskId": "FEATURE-51450",
+      "title": "Fleet Performance KPIs",
+      "slug": "fleet-performance-kpis",
+      "state": "planned",
+      "status": "not-started",
+      "storyCount": 3,
+      "totalStoryPoints": 12,
+      "files": {
+        "specs": "specs/fleet-performance-kpis/specs.md",
+        "requirements": "specs/fleet-performance-kpis/requirements.md",
+        "prompt": "specs/fleet-performance-kpis/prompt.md"
+      },
+      "userStories": [
+        {
+          "id": 51579,
+          "title": "As Fleet Analyst, I want to perform KPI dashboard access to achieve real-time fleet performance insights",
+          "state": "New",
+          "storyPoints": 3
+        },
+        {
+          "id": 51570,
+          "title": "As Fleet Maintenance Coordinator, I want to perform maintenance cost reporting to achieve cost control and scheduling efficiency",
+          "state": "New",
+          "storyPoints": 4
+        },
+        {
+          "id": 51561,
+          "title": "As Fleet Manager, I want to perform fleet utilization monitoring to achieve optimized asset deployment",
+          "state": "New",
+          "storyPoints": 5
+        }
+      ]
+    }
+  ]
+}
