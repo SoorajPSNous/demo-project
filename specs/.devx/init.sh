@@ -14,6 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEVX_DIR="$SCRIPT_DIR"
 CONFIG_FILE="$DEVX_DIR/config.json"
 WORKSPACE_CONTEXT_FILE="$DEVX_DIR/workspace-context.md"
+GOLDEN_STACK_ENV_FILE="$DEVX_DIR/guidance/golden-stack-options.env"
 LOCK_FILE="$DEVX_DIR/init.lock"
 LOG_DIR="$DEVX_DIR/logs"
 TMP_DIR="$DEVX_DIR/tmp"
@@ -30,7 +31,15 @@ SKIP_VALIDATION=0
 ONLY=""
 SELECTED_TOOL=""
 STEP_RESULTS=""
+NON_SCAFFOLDABLE=()
 REACT_POST_CREATE="ask"
+GOLDEN_UI_OPTIONS=""
+GOLDEN_BACKEND_OPTIONS=""
+GOLDEN_DATABASE_OPTIONS=""
+GOLDEN_AI_OPTIONS=""
+GOLDEN_UI_CUSTOM_OPTIONS=""
+GOLDEN_BACKEND_CUSTOM_OPTIONS=""
+GOLDEN_DATABASE_CUSTOM_OPTIONS=""
 
 AVAILABLE_TOOLS=("claude" "codex" "cursor" "copilot" "windsurf" "cline" "kiro")
 
@@ -235,13 +244,13 @@ choose_menu() {
   [ "$count" -le 0 ] && return 1
   case "${options[0]}" in 0\)*) starts_at_zero=1 ;; esac
 
-  printf '\n%s%s%s\n' "$C_BOLD" "$title" "$C_RESET"
+  printf '\n%s%s%s\n' "$C_BOLD" "$title" "$C_RESET" >&2
   if [ ! -t 0 ]; then
     local i typed
     for i in "${!options[@]}"; do
-      printf '  %s\n' "${options[$i]}"
+      printf '  %s\n' "${options[$i]}" >&2
     done
-    printf 'Choice: '
+    printf 'Choice: ' >&2
     read -r typed
     if [ "$starts_at_zero" = "1" ] && [[ "$typed" =~ ^[0-9]+$ ]] && [ "$typed" -ge 0 ] && [ "$typed" -lt "$count" ]; then
       MENU_CHOICE_INDEX="$typed"
@@ -251,7 +260,7 @@ choose_menu() {
     return 0
   fi
 
-  printf '%sUse Up/Down arrows, j/k, w/s, and Enter/Space, or press a number.%s\n' "$C_DIM" "$C_RESET"
+  printf '%sUse Up/Down arrows, j/k, w/s, and Enter/Space, or press a number.%s\n' "$C_DIM" "$C_RESET" >&2
   MENU_TTY_STATE="$(stty -g 2>/dev/null || true)"
   if [ -n "$MENU_TTY_STATE" ]; then
     MENU_PREV_EXIT_TRAP="$(trap -p EXIT)"
@@ -265,9 +274,9 @@ choose_menu() {
     local i
     for i in "${!options[@]}"; do
       if [ "$i" -eq "$MENU_CHOICE_INDEX" ]; then
-        printf '  %s> %s%s\n' "$C_CYAN$C_BOLD" "${options[$i]}" "$C_RESET"
+        printf '  %s> %s%s\n' "$C_CYAN$C_BOLD" "${options[$i]}" "$C_RESET" >&2
       else
-        printf '    %s\n' "${options[$i]}"
+        printf '    %s\n' "${options[$i]}" >&2
       fi
     done
 
@@ -288,12 +297,12 @@ choose_menu() {
         fi
         ;;
     esac
-    printf '\033[%sA\033[J' "$count"
+    printf '\033[%sA\033[J' "$count" >&2
   done
   restore_menu_tty
   restore_menu_traps
-  printf '\033[%sA\033[J' "$count"
-  printf '  %s> %s%s\n' "$C_GREEN$C_BOLD" "${options[$MENU_CHOICE_INDEX]}" "$C_RESET"
+  printf '\033[%sA\033[J' "$count" >&2
+  printf '  %s> %s%s\n' "$C_GREEN$C_BOLD" "${options[$MENU_CHOICE_INDEX]}" "$C_RESET" >&2
 }
 
 normalize_tool_choice() {
@@ -426,6 +435,115 @@ safe_version() {
   else
     printf "missing"
   fi
+}
+
+load_golden_stack_options() {
+  if [ -f "$GOLDEN_STACK_ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$GOLDEN_STACK_ENV_FILE"
+    GOLDEN_UI_OPTIONS="$(printf '%s' "${GOLDEN_UI_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_BACKEND_OPTIONS="$(printf '%s' "${GOLDEN_BACKEND_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_DATABASE_OPTIONS="$(printf '%s' "${GOLDEN_DATABASE_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_AI_OPTIONS="$(printf '%s' "${GOLDEN_AI_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_UI_CUSTOM_OPTIONS="$(printf '%s' "${GOLDEN_UI_CUSTOM_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_BACKEND_CUSTOM_OPTIONS="$(printf '%s' "${GOLDEN_BACKEND_CUSTOM_OPTIONS:-}" | tr -d '\r')"
+    GOLDEN_DATABASE_CUSTOM_OPTIONS="$(printf '%s' "${GOLDEN_DATABASE_CUSTOM_OPTIONS:-}" | tr -d '\r')"
+    debug "Loaded Golden Repo stack options from $GOLDEN_STACK_ENV_FILE"
+  fi
+}
+
+load_golden_stack_options
+
+first_golden_option() {
+  local csv="$1"
+  IFS=',' read -r -a GOLDEN_ITEMS <<< "$csv"
+  if [ "${#GOLDEN_ITEMS[@]}" -gt 0 ] && [ -n "${GOLDEN_ITEMS[0]}" ]; then
+    printf '%s' "${GOLDEN_ITEMS[0]}"
+  else
+    printf ''
+  fi
+}
+
+append_csv_options() {
+  local csv="$1"
+  local value
+  IFS=',' read -r -a _tmp_items <<< "$csv"
+  for value in "${_tmp_items[@]}"; do
+    value="$(printf '%s' "$value" | tr -d '\r' | tr -cd '\11\12\15\40-\176' | sed 's/^ *//; s/ *$//')"
+    [ -z "$value" ] && continue
+    MENU_LABELS+=("$value")
+    MENU_VALUES+=("$value")
+  done
+}
+
+append_option() {
+  local label="$1"
+  local value="$2"
+  MENU_LABELS+=("$label")
+  MENU_VALUES+=("$value")
+}
+
+choose_from_labels() {
+  local title="$1"
+  local default_index="$2"
+  local opts=()
+  local i=0
+  for i in "${!MENU_LABELS[@]}"; do
+    opts+=("$i) ${MENU_LABELS[$i]}")
+  done
+  choose_menu "$title" "$default_index" "${opts[@]}"
+  printf '%s' "${MENU_VALUES[$MENU_CHOICE_INDEX]}"
+}
+
+prompt_custom_stack_once() {
+  local layer_label="$1"
+  local typed=""
+  while true; do
+    printf "Enter custom %s stack: " "$layer_label" >&2
+    read -r typed
+    typed="$(printf '%s' "$typed" | sed 's/^ *//; s/ *$//')"
+    if [ -n "$typed" ]; then
+      printf '%s' "$typed"
+      return 0
+    fi
+    warn "Please enter a non-empty value."
+  done
+}
+
+select_stack_with_golden() {
+  local layer_label="$1"
+  local extracted_csv="$2"
+  local extracted_custom_csv="$3"
+  local yes_default="$4"
+  local final="none"
+
+  if [ "$YES" = "1" ]; then
+    final="$(first_golden_option "$extracted_csv")"
+    if [ -z "$final" ]; then
+      final="$yes_default"
+    fi
+    printf '%s' "$final"
+    return 0
+  fi
+
+  MENU_LABELS=()
+  MENU_VALUES=()
+  append_csv_options "$extracted_csv"
+  append_csv_options "$extracted_custom_csv"
+
+  if [ "${#MENU_LABELS[@]}" -gt 0 ]; then
+    append_option "Other" "__OTHER__"
+    printf '
+%sGolden Repo extracted %s stack options:%s
+' "$C_BOLD" "$layer_label" "$C_RESET" >&2
+    final="$(choose_from_labels "Choose a $layer_label stack" 0)"
+    if [ "$final" != "__OTHER__" ]; then
+      printf '%s' "$final"
+      return 0
+    fi
+  fi
+
+  printf '%s' "__OTHER__"
 }
 
 detect_package_manager() {
@@ -616,8 +734,34 @@ select_missing_layers() {
   SELECT_BACKEND="none"
   SELECT_DB="none"
   NEEDS_USER_DECISION=""
+  local ui_selected=""
+  local backend_selected=""
+  local db_selected=""
 
-  if [ "$UI_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "ui" ]; }; then
+  if { [ -z "$ONLY" ] || [ "$ONLY" = "ui" ]; }; then
+    ui_selected="$(select_stack_with_golden "UI" "${GOLDEN_UI_OPTIONS:-}" "${GOLDEN_UI_CUSTOM_OPTIONS:-}" "react")"
+    if [ "$ui_selected" != "__OTHER__" ] && [ -n "$ui_selected" ]; then
+      SELECT_UI="$ui_selected"
+    fi
+  fi
+
+  if [ "$SELECT_UI" = "none" ] && [ "$ui_selected" = "__OTHER__" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "ui" ]; }; then
+    choose_menu "Choose a UI framework:" 1 \
+      "0) None" \
+      "1) React (Vite + TypeScript)" \
+      "2) Angular (Angular CLI)" \
+      "3) Vue (create-vue)" \
+      "4) Svelte (sv create)" \
+      "5) Other"
+    case "$MENU_CHOICE_INDEX" in
+      1) SELECT_UI="react" ;;
+      2) SELECT_UI="angular" ;;
+      3) SELECT_UI="vue" ;;
+      4) SELECT_UI="svelte" ;;
+      5) SELECT_UI="$(prompt_custom_stack_once "UI")" ;;
+      *) SELECT_UI="none" ;;
+    esac
+  elif [ "$SELECT_UI" = "none" ] && [ "$UI_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "ui" ]; }; then
     if [ "$YES" = "1" ]; then
       SELECT_UI="react"
     else
@@ -639,7 +783,34 @@ select_missing_layers() {
     NEEDS_USER_DECISION="$NEEDS_USER_DECISION ui-conflict"
   fi
 
-  if [ "$BACKEND_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "backend" ]; }; then
+  if { [ -z "$ONLY" ] || [ "$ONLY" = "backend" ]; }; then
+    backend_selected="$(select_stack_with_golden "backend" "${GOLDEN_BACKEND_OPTIONS:-}" "${GOLDEN_BACKEND_CUSTOM_OPTIONS:-}" "node")"
+    if [ "$backend_selected" != "__OTHER__" ] && [ -n "$backend_selected" ]; then
+      SELECT_BACKEND="$backend_selected"
+    fi
+  fi
+
+  if [ "$SELECT_BACKEND" = "none" ] && [ "$backend_selected" = "__OTHER__" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "backend" ]; }; then
+    choose_menu "Choose a backend stack:" 1 \
+      "0) None" \
+      "1) Node.js / Express" \
+      "2) Python / FastAPI" \
+      "3) Go" \
+      "4) .NET Web API" \
+      "5) PHP / Laravel" \
+      "6) Ruby on Rails" \
+      "7) Other"
+    case "$MENU_CHOICE_INDEX" in
+      1) SELECT_BACKEND="node" ;;
+      2) SELECT_BACKEND="python" ;;
+      3) SELECT_BACKEND="go" ;;
+      4) SELECT_BACKEND="dotnet" ;;
+      5) SELECT_BACKEND="php" ;;
+      6) SELECT_BACKEND="rails" ;;
+      7) SELECT_BACKEND="$(prompt_custom_stack_once "backend")" ;;
+      *) SELECT_BACKEND="none" ;;
+    esac
+  elif [ "$SELECT_BACKEND" = "none" ] && [ "$BACKEND_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "backend" ]; }; then
     if [ "$YES" = "1" ]; then
       SELECT_BACKEND="node"
     else
@@ -665,7 +836,32 @@ select_missing_layers() {
     NEEDS_USER_DECISION="$NEEDS_USER_DECISION backend-conflict"
   fi
 
-  if [ "$DB_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "database" ]; }; then
+  if { [ -z "$ONLY" ] || [ "$ONLY" = "database" ]; }; then
+    db_selected="$(select_stack_with_golden "database" "${GOLDEN_DATABASE_OPTIONS:-}" "${GOLDEN_DATABASE_CUSTOM_OPTIONS:-}" "none")"
+    if [ "$db_selected" != "__OTHER__" ] && [ -n "$db_selected" ]; then
+      SELECT_DB="$db_selected"
+    fi
+  fi
+
+  if [ "$SELECT_DB" = "none" ] && [ "$db_selected" = "__OTHER__" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "database" ]; }; then
+    choose_menu "Choose database configuration guidance:" 0 \
+      "0) None" \
+      "1) MySQL" \
+      "2) SQL Server" \
+      "3) PostgreSQL" \
+      "4) MongoDB" \
+      "5) Oracle" \
+      "6) Other"
+    case "$MENU_CHOICE_INDEX" in
+      1) SELECT_DB="mysql" ;;
+      2) SELECT_DB="sqlserver" ;;
+      3) SELECT_DB="postgres" ;;
+      4) SELECT_DB="mongodb" ;;
+      5) SELECT_DB="oracle" ;;
+      6) SELECT_DB="$(prompt_custom_stack_once "database")" ;;
+      *) SELECT_DB="none" ;;
+    esac
+  elif [ "$SELECT_DB" = "none" ] && [ "$DB_STATUS" = "missing" ] && { [ -z "$ONLY" ] || [ "$ONLY" = "database" ]; }; then
     if [ "$YES" = "1" ]; then
       SELECT_DB="none"
     else
@@ -709,11 +905,18 @@ select_missing_layers() {
 
 register_steps() {
   STEPS=()
+  NON_SCAFFOLDABLE=()
+  local ui_step_stack="$SELECT_UI"
+  local backend_step_stack="$SELECT_BACKEND"
+  case "$ui_step_stack" in react|angular|vue|svelte|nextjs|nuxt|astro|remix|solid|preact|lit|expo|flutter|none) ;; *) ui_step_stack="none" ;; esac
+  case "$backend_step_stack" in node|python|go|dotnet|php|rails|nestjs|fastify|django|symfony|phoenix|spring|rust|none) ;; *) backend_step_stack="none" ;; esac
+  if [ "$SELECT_UI" != "none" ] && [ "$ui_step_stack" = "none" ]; then NON_SCAFFOLDABLE+=("UI:$SELECT_UI"); fi
+  if [ "$SELECT_BACKEND" != "none" ] && [ "$backend_step_stack" = "none" ]; then NON_SCAFFOLDABLE+=("backend:$SELECT_BACKEND"); fi
   if [ -z "$ONLY" ] || [ "$ONLY" = "ui" ]; then
-    [ "$SELECT_UI" != "none" ] && STEPS+=("scaffold-ui:$SELECT_UI:$UI_TARGET")
+    [ "$ui_step_stack" != "none" ] && STEPS+=("scaffold-ui:$ui_step_stack:$UI_TARGET")
   fi
   if [ -z "$ONLY" ] || [ "$ONLY" = "backend" ]; then
-    [ "$SELECT_BACKEND" != "none" ] && STEPS+=("scaffold-backend:$SELECT_BACKEND:$BACKEND_TARGET")
+    [ "$backend_step_stack" != "none" ] && STEPS+=("scaffold-backend:$backend_step_stack:$BACKEND_TARGET")
   fi
   if [ -z "$ONLY" ] || [ "$ONLY" = "database" ]; then
     [ "$SELECT_DB" != "none" ] && STEPS+=("configure-database:$SELECT_DB:.")
@@ -745,7 +948,23 @@ step_command() {
     scaffold-ui:angular) printf 'npx -y @angular/cli@latest new %s --routing --style css --skip-git --defaults --skip-install' "$target" ;;
     scaffold-ui:vue) printf '%s vue@latest %s -- --default --typescript --no-git' "$create_cmd" "$target" ;;
     scaffold-ui:svelte) printf 'npx -y sv@latest create %s --template minimal --types ts --no-add-ons --no-install' "$target" ;;
+    scaffold-ui:nextjs) printf 'npx -y create-next-app@latest %s --ts --app --eslint --no-tailwind --no-src-dir --import-alias "@/*" --use-npm --skip-install' "$target" ;;
+    scaffold-ui:nuxt) printf 'npx -y nuxi@latest init %s --packageManager npm --no-install' "$target" ;;
+    scaffold-ui:astro) printf '%s astro@latest %s -- --template minimal --no-install --no-git --skip-houston --typescript strict --yes' "$create_cmd" "$target" ;;
+    scaffold-ui:remix) printf 'npx -y create-remix@latest %s --no-install --no-git-init --yes' "$target" ;;
+    scaffold-ui:solid) printf 'npx -y degit solidjs/templates/ts %s' "$target" ;;
+    scaffold-ui:preact) printf '%s vite@latest %s -- --template preact-ts' "$create_cmd" "$target" ;;
+    scaffold-ui:lit) printf '%s vite@latest %s -- --template lit-ts' "$create_cmd" "$target" ;;
+    scaffold-ui:expo) printf 'npx -y create-expo-app@latest %s --no-install --yes' "$target" ;;
+    scaffold-ui:flutter) printf 'flutter create %s' "$target" ;;
     scaffold-backend:node) printf 'npx -y express-generator@latest %s --no-view --git' "$target" ;;
+    scaffold-backend:nestjs) printf 'npx -y @nestjs/cli@latest new %s --skip-git --skip-install --package-manager npm' "$target" ;;
+    scaffold-backend:fastify) printf 'mkdir -p %s && npx -y fastify-cli@latest generate %s --lang=ts' "$target" "$target" ;;
+    scaffold-backend:django) printf 'mkdir -p %s && cd %s && python3 -m venv .venv && . .venv/bin/activate && python -m pip install django && django-admin startproject app .' "$target" "$target" ;;
+    scaffold-backend:symfony) printf 'composer create-project symfony/skeleton %s --no-interaction' "$target" ;;
+    scaffold-backend:phoenix) printf 'mix phx.new %s --no-install --no-ecto' "$target" ;;
+    scaffold-backend:spring) printf 'curl -fsSL https://start.spring.io/starter.zip -d type=maven-project -d language=java -d dependencies=web -d baseDir=%s -d name=%s -o %s.zip && unzip -o %s.zip && rm -f %s.zip' "$target" "$target" "$target" "$target" "$target" ;;
+    scaffold-backend:rust) printf 'cargo new %s --bin' "$target" ;;
     scaffold-backend:python) printf 'mkdir -p %s/app && cd %s && python3 -m venv .venv && . .venv/bin/activate && python -m pip install fastapi uvicorn && printf "from fastapi import FastAPI\\n\\napp = FastAPI()\\n\\n@app.get(\047/health\047)\\ndef health():\\n    return {\047status\047: \047ok\047}\\n" > app/main.py' "$target" "$target" ;;
     scaffold-backend:go) printf 'mkdir -p %s && cd %s && go mod init example.com/devx-api && printf "package main\\n\\nimport (\\n  \042net/http\042\\n)\\n\\nfunc main() {\\n  http.HandleFunc(\042/health\042, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(\042ok\042)) })\\n  http.ListenAndServe(\042:8080\042, nil)\\n}\\n" > main.go' "$target" "$target" ;;
     scaffold-backend:dotnet) printf 'dotnet new webapi -o %s --no-restore' "$target" ;;
@@ -762,12 +981,16 @@ required_tool_for_step() {
   local id="$1"
   local stack="$2"
   case "$id:$stack" in
-    scaffold-ui:react|scaffold-ui:vue|scaffold-ui:svelte|scaffold-ui:angular|scaffold-backend:node) printf "node npm" ;;
-    scaffold-backend:python) printf "python3" ;;
+    scaffold-ui:react|scaffold-ui:vue|scaffold-ui:svelte|scaffold-ui:angular|scaffold-ui:nextjs|scaffold-ui:nuxt|scaffold-ui:astro|scaffold-ui:remix|scaffold-ui:solid|scaffold-ui:preact|scaffold-ui:lit|scaffold-ui:expo|scaffold-backend:node|scaffold-backend:nestjs|scaffold-backend:fastify) printf "node npm" ;;
+    scaffold-ui:flutter) printf "flutter" ;;
+    scaffold-backend:python|scaffold-backend:django) printf "python3" ;;
     scaffold-backend:go) printf "go" ;;
     scaffold-backend:dotnet) printf "dotnet" ;;
-    scaffold-backend:php) printf "php composer" ;;
+    scaffold-backend:php|scaffold-backend:symfony) printf "php composer" ;;
     scaffold-backend:rails) printf "ruby rails" ;;
+    scaffold-backend:phoenix) printf "mix" ;;
+    scaffold-backend:spring) printf "curl unzip" ;;
+    scaffold-backend:rust) printf "cargo" ;;
     *) printf "" ;;
   esac
 }
@@ -808,6 +1031,16 @@ preview_plan() {
       printf '  %s->%s [%s] %s -> %s\n' "$C_CYAN" "$C_RESET" "$id" "$stack" "$target"
       printf '     %s%s%s\n' "$C_DIM" "$(step_command "$id" "$stack" "$target")" "$C_RESET"
     done
+  fi
+  if [ "${#NON_SCAFFOLDABLE[@]}" -gt 0 ]; then
+    echo ""
+    printf '%sRecorded but not auto-scaffolded%s\n' "$C_BOLD" "$C_RESET"
+    local ns_entry
+    for ns_entry in "${NON_SCAFFOLDABLE[@]}"; do
+      printf '  %s!%s %s\n' "$C_YELLOW" "$C_RESET" "$ns_entry"
+    done
+    echo "  init.sh cannot auto-scaffold these stacks (for example KMP, native Android/iOS)."
+    echo "  Your selection is saved in specs/.devx/config.json. Ask your AI coding agent to generate the starter project for them."
   fi
   echo ""
   if [ "$DRY_RUN" = "1" ]; then
@@ -1101,7 +1334,7 @@ CONFIG
 # Build the universal context from project.md + workflow.md
 PROJECT_CONTEXT=$(cat "$DEVX_DIR/project.md")
 WORKFLOW_CONTEXT=$(cat "$DEVX_DIR/workflow.md")
-CENTRAL_CONTEXT_REFERENCE="This repository uses Astra Spec-Driven Development. Read specs/.devx/workspace-context.md first, then follow specs/.devx/features.json and each specs/<feature-slug>/ folder."
+CENTRAL_CONTEXT_REFERENCE="This repository uses Astra Spec-Driven Development. Read specs/.devx/workspace-context.md first, then follow specs/.devx/features.json and each specs/<feature-slug>/ folder. Feature presence: a tracked feature is actionable only if specs/<slug>/specs.md exists in this checkout; features are pushed selectively, so a tracked-but-absent folder is expected, not an error. Skip any PENDING feature whose specs/<slug>/specs.md is missing, report the skipped slug, and never modify its features.json/tracker.json entry. Never mark a feature done/COMPLETED unless its specs/<slug>/specs.md and requirements.md were read this session. A change-map file is not proof of presence; only specs/<slug>/specs.md is authoritative. Golden Repo guidance: when specs/.devx/guidance/ or specs/.devx/skills/ui-design/ golden files exist, you MUST read them before implementing (required, not optional). The Golden Repo may target a different stack, so do not apply blindly: for each cross-cutting convention (e.g. CSRF synchronizer tokens, i18n/resource files, the UI design system/tokens) either apply it or mark it not-applicable-to-this-stack with a one-line rationale, and include a short Golden Repo Reconciliation note. Verified local patterns override golden guidance on conflict. Do not mark a feature done/COMPLETED when golden artifacts exist unless this read-and-reconcile was completed. Open Questions: before implementing a feature read its Open Questions (features.json openQuestions[] or the specs.md Open Questions section); never leave them write-only. Interactive mode: surface them and ask before building. Unattended/autopilot mode: do not stop to ask - for each Open Question choose a reasonable assumption and record the decision plus a one-line rationale in specs/<slug>/assumptions.md; never assume silently. A feature at status needs-clarification (tracker NEEDS_CLARIFICATION) has a blocking question: skip and report it like an absent folder and leave its entry untouched. Never mark a feature done/COMPLETED while a blocking Open Question is unresolved and unrecorded."
 
 COMBINED_CONTEXT="$PROJECT_CONTEXT
 
@@ -1188,9 +1421,9 @@ setup_claude() {
 }
 
 setup_codex_wrappers() {
-  local codex_dir="$DEVX_DIR/codex"
+  local codex_dir="$REPO_ROOT/.codex/devx"
   if [ "$DRY_RUN" = "1" ]; then
-    info "Dry-run: would create Codex automation helpers in specs/.devx/codex"
+    info "Dry-run: would create Codex automation helpers in .codex/devx"
     return
   fi
 
@@ -1199,10 +1432,11 @@ setup_codex_wrappers() {
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEVX_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DEVX_DIR="$REPO_ROOT/specs/.devx"
 PROMPT="$(bash "$DEVX_DIR/devx-command.sh" implement-next)"
 if command -v codex >/dev/null 2>&1; then
-  codex "$PROMPT" || {
+  codex -C "$REPO_ROOT" "$PROMPT" || {
     printf '%s\n\n' "Codex CLI could not start interactively. Use this prompt manually:"
     printf '%s\n' "$PROMPT"
   }
@@ -1216,14 +1450,15 @@ CODEX_EOF
 #!/usr/bin/env bash
 set -euo pipefail
 if [ -z "${1:-}" ]; then
-  echo "Usage: bash specs/.devx/codex/implement-feature.sh <feature-slug>" >&2
+  echo "Usage: bash .codex/devx/implement-feature.sh <feature-slug>" >&2
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEVX_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DEVX_DIR="$REPO_ROOT/specs/.devx"
 PROMPT="$(bash "$DEVX_DIR/devx-command.sh" implement-feature "$1")"
 if command -v codex >/dev/null 2>&1; then
-  codex "$PROMPT" || {
+  codex -C "$REPO_ROOT" "$PROMPT" || {
     printf '%s\n\n' "Codex CLI could not start interactively. Use this prompt manually:"
     printf '%s\n' "$PROMPT"
   }
@@ -1237,14 +1472,15 @@ CODEX_EOF
 #!/usr/bin/env bash
 set -euo pipefail
 if [ -z "${1:-}" ]; then
-  echo "Usage: bash specs/.devx/codex/validate-feature.sh <feature-slug>" >&2
+  echo "Usage: bash .codex/devx/validate-feature.sh <feature-slug>" >&2
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEVX_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DEVX_DIR="$REPO_ROOT/specs/.devx"
 PROMPT="$(bash "$DEVX_DIR/devx-command.sh" validate-feature "$1")"
 if command -v codex >/dev/null 2>&1; then
-  codex "$PROMPT" || {
+  codex -C "$REPO_ROOT" "$PROMPT" || {
     printf '%s\n\n' "Codex CLI could not start interactively. Use this prompt manually:"
     printf '%s\n' "$PROMPT"
   }
@@ -1255,12 +1491,12 @@ fi
 CODEX_EOF
 
   chmod +x "$codex_dir"/*.sh 2>/dev/null || true
-  info "Created Codex automation helpers in specs/.devx/codex"
+  info "Created Codex automation helpers in .codex/devx"
   echo ""
   echo "Codex automation:"
-  echo "  bash specs/.devx/codex/implement-next.sh"
-  echo "  bash specs/.devx/codex/implement-feature.sh <feature-slug>"
-  echo "  bash specs/.devx/codex/validate-feature.sh <feature-slug>"
+  echo "  bash .codex/devx/implement-next.sh"
+  echo "  bash .codex/devx/implement-feature.sh <feature-slug>"
+  echo "  bash .codex/devx/validate-feature.sh <feature-slug>"
 }
 
 setup_codex() {
@@ -1403,6 +1639,14 @@ if [ "$DRY_RUN" = "1" ]; then
   success "Dry run complete. No workspace files were changed."
 else
   success "Done. DevX init status is recorded in specs/.devx/config.json"
+fi
+if [ "${#NON_SCAFFOLDABLE[@]}" -gt 0 ]; then
+  printf '\n%sStacks recorded but not auto-scaffolded%s\n' "$C_BOLD" "$C_RESET"
+  for ns_entry in "${NON_SCAFFOLDABLE[@]}"; do
+    printf '  %s!%s %s\n' "$C_YELLOW" "$C_RESET" "$ns_entry"
+  done
+  echo "  init.sh cannot auto-scaffold these (for example KMP, native Android/iOS). Your choice is saved in specs/.devx/config.json."
+  echo "  Ask your AI coding agent (Cursor, Copilot, Claude, etc.) to generate the starter project for them, then rerun discovery."
 fi
 printf '\n%sNext steps%s\n' "$C_BOLD" "$C_RESET"
 printf '  %s1.%s Review specs/.devx/workspace-context.md\n' "$C_CYAN" "$C_RESET"

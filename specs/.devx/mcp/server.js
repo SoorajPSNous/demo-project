@@ -16,14 +16,11 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { resolve } from "path";
+import { getRepoRoot } from "../../../utils/module-paths";
 
 // Resolve paths relative to repo root (specs/.devx/mcp/ -> repo root)
-const REPO_ROOT = resolve(__dirname, "..", "..", "..");
+const REPO_ROOT = getRepoRoot();
 const SPECS_DIR = resolve(REPO_ROOT, "specs");
 const DEVX_DIR = resolve(SPECS_DIR, ".devx");
 const FEATURES_JSON = resolve(DEVX_DIR, "features.json");
@@ -95,7 +92,7 @@ const TOOLS = [
   },
   {
     name: "get_requirements",
-    description: "Get the requirements.md checklist for a feature.",
+    description: "Get the requirements.md implementation acceptance checklist for a feature.",
     inputSchema: {
       type: "object",
       properties: {
@@ -122,7 +119,7 @@ const TOOLS = [
   },
   {
     name: "validate_implementation",
-    description: "Return the requirements checklist for a feature so you can validate your implementation against it.",
+    description: "Return the implementation acceptance checklist for a feature so you can validate your implementation against it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -249,7 +246,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 next.files.tddTests ? `- TDD Tests: ${next.files.tddTests}` : null,
                 `- Prompt: ${next.files.prompt}`,
                 ``,
-                `Use get_feature_specs or get_requirements to read the details.`,
+                `Use get_feature_specs or get_requirements to read the details. requirements.md must be an implementation acceptance checklist, not a spec-quality PASS/FAIL report.`,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -275,7 +272,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: [
                 `# Validation Checklist — ${feature.title}`,
                 ``,
-                `Go through each requirement below and verify it is satisfied in the implementation.`,
+                `Go through each implementation acceptance item below and verify it is satisfied in the implementation.`,
+                `If this content is a spec-quality PASS/FAIL report, stop and regenerate or repair the spec bundle before validating.`,
                 ``,
                 content,
               ].join("\n"),

@@ -18,10 +18,11 @@ node - "$FEATURES_FILE" "$TRACKER_FILE" "$GENERATION_FILE" "$SPECS_DIR" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 const [featuresFile, trackerFile, generationFile, specsDir] = process.argv.slice(2);
-const allowedStatuses = new Set(["not-started", "in-progress", "done", "blocked", "needs-review"]);
-const trackerStatuses = new Set(["PENDING", "IN_PROGRESS", "COMPLETED", "BLOCKED", "NEEDS_REVIEW"]);
+const allowedStatuses = new Set(["not-started", "in-progress", "done", "blocked", "needs-review", "needs-clarification"]);
+const trackerStatuses = new Set(["PENDING", "IN_PROGRESS", "COMPLETED", "BLOCKED", "NEEDS_REVIEW", "NEEDS_CLARIFICATION"]);
 const issues = [];
 const repairs = [];
+const absent = [];
 const now = new Date().toISOString();
 
 function titleFromSlug(slug) {
@@ -40,6 +41,7 @@ function trackerStatusFromFeatureStatus(status) {
   if (status === "in-progress") return "IN_PROGRESS";
   if (status === "blocked") return "BLOCKED";
   if (status === "needs-review") return "NEEDS_REVIEW";
+  if (status === "needs-clarification") return "NEEDS_CLARIFICATION";
   return "PENDING";
 }
 
@@ -48,6 +50,7 @@ function featureStatusFromTrackerStatus(status) {
   if (status === "IN_PROGRESS") return "in-progress";
   if (status === "BLOCKED") return "blocked";
   if (status === "NEEDS_REVIEW") return "needs-review";
+  if (status === "NEEDS_CLARIFICATION") return "needs-clarification";
   return "not-started";
 }
 
@@ -118,9 +121,29 @@ for (const feature of data.features) {
     seenPaths.add(filePath);
   }
 
-  for (const requiredPath of [files.specs, files.requirements, files.prompt]) {
-    if (!fs.existsSync(path.join(path.dirname(specsDir), requiredPath))) {
-      issues.push(`Missing tracked file for "${slug}": ${requiredPath}`);
+  // A feature can be tracked in features.json/tracker.json without its
+  // specs/<slug>/ folder being present in this checkout (features are pushed to
+  // the repo selectively). Treat a not-present folder as a non-blocking "skip"
+  // rather than a hard error: record it in `absent` (see notice below) instead
+  // of `issues`, and leave its tracking entry completely untouched so a later
+  // push restores it. Genuine problems (bad JSON, duplicates, missing slug)
+  // still go through `issues` and keep blocking.
+  const repoRoot = path.dirname(specsDir);
+  const featureDir = path.dirname(path.join(repoRoot, files.specs));
+  const missingPaths = [files.specs, files.requirements, files.prompt].filter(
+    (requiredPath) => !fs.existsSync(path.join(repoRoot, requiredPath)),
+  );
+  if (missingPaths.length > 0) {
+    if (!fs.existsSync(featureDir)) {
+      // Whole specs/<slug>/ folder is not in this checkout (features are pushed
+      // selectively) -> non-blocking skip; tracking entry left untouched.
+      absent.push({ slug, missing: missingPaths });
+    } else {
+      // Folder is present but a required file is missing -> genuine corruption or
+      // a partial push; keep blocking so it is not silently skipped.
+      for (const requiredPath of missingPaths) {
+        issues.push(`Missing tracked file for "${slug}": ${requiredPath}`);
+      }
     }
   }
 
@@ -220,7 +243,14 @@ console.log(JSON.stringify({
   changed: before !== after || trackerBefore !== trackerAfter || generationBefore !== generationAfter,
   issues,
   repairs,
+  absent,
 }, null, 2));
+if (absent.length > 0) {
+  console.error("");
+  console.error("DevX notice: " + absent.length + " tracked feature folder(s) are not present in this checkout and will be skipped:");
+  for (const a of absent) console.error("  - " + a.slug);
+  console.error("These entries remain in features.json/tracker.json and will resume automatically once their specs/<slug>/ folder is pushed. This is not an error.");
+}
 if (issues.length > 0) process.exitCode = 2;
 NODE
 node_status=$?
@@ -318,11 +348,32 @@ NODE
     fi
   fi
   dirty="$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)"
-  if [ -n "$dirty" ] && [ "$ALLOW_DIRTY" != "1" ]; then
+  blocking_dirty=""
+  ignored_setup_dirty=""
+  while IFS= read -r dirty_line; do
+    [ -z "$dirty_line" ] && continue
+    dirty_path="${dirty_line:3}"
+    case "$dirty_path" in
+      .codex/*|AGENTS.md|specs/.devx/config.json|specs/.devx/workspace-context.md|specs/.devx/features.json|specs/.devx/generation.json|specs/.devx/tracker.json|specs/.devx/logs/*|specs/.devx/tmp/*|specs/.devx/init.lock)
+        ignored_setup_dirty="${ignored_setup_dirty}${dirty_line}
+"
+        ;;
+      *)
+        blocking_dirty="${blocking_dirty}${dirty_line}
+"
+        ;;
+    esac
+  done <<< "$dirty"
+  if [ -n "$blocking_dirty" ] && [ "$ALLOW_DIRTY" != "1" ]; then
     printf '%s\n' "DevX tracking preflight stopped because the workspace has uncommitted changes."
     printf '%s\n' "Commit or stash completed code and tracking updates before running code generation."
     printf '%s\n\n' "Use DEVX_ALLOW_DIRTY=1 only when you intentionally want to override this guard."
-    printf '%s\n' "$dirty"
+    if [ -n "$ignored_setup_dirty" ]; then
+      printf '%s\n' "Ignored setup-only paths:"
+      printf '%s\n' "$ignored_setup_dirty"
+      printf '\n'
+    fi
+    printf '%s\n' "$blocking_dirty"
     exit 3
   fi
 fi

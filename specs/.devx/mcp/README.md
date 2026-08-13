@@ -95,6 +95,6 @@ Add to \`.kiro/settings/mcp.json\`:
 | \`get_requirements\` | Get requirements.md checklist for a feature |
 | \`get_tdd_tests\` | Get tdd-tests.md for a feature (if TDD enabled) |
 | \`get_next_feature\` | Suggest next feature to implement (first "not-started") |
-| \`validate_implementation\` | Return requirements checklist for validation |
+| \`validate_implementation\` | Return implementation acceptance checklist for validation |
 | \`mark_feature_done\` | Update feature status in features.json and tracker.json |
 | \`get_project_context\` | Return project.md + workflow.md content |

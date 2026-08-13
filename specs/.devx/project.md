@@ -1,9 +1,13 @@
-# SP
+# Alpine
 
 > Auto-generated project context for AI-assisted development.
-> Last updated: 2026-06-23
+> Last updated: 2026-08-13
 
-**Organization:** https://dev.azure.com/QS001/
+**Organization:** QS001-SPS-3
+
+## Overview
+
+Migration of existing angular UI 7 to latest verstion.
 
 ## Development Methodology
 
@@ -11,15 +15,12 @@ This project follows **Spec-Driven Development (SDD)**.
 
 Every feature has:
 - `specs.md` — Full technical specification
-- `requirements.md` — Acceptance criteria checklist
+- `requirements.md` — Implementation acceptance checklist
 - `prompt.md` — Ready-to-use implementation prompt
 
-## Features (4)
+## Features (1)
 
-- **Inventory Turn Analytics** (3 user stories)
-- **Sales Pipeline Analytics** (3 user stories)
-- **Service Retention Analytics** (3 user stories)
-- **Fleet Performance KPIs** (3 user stories)
+- **As Wealth Manager, I want to perform real-time data retrieval of portfolio holdings to achieve up-to-date insights for my clients** (1 user stories)
 
 ## Getting Started
 
@@ -44,7 +45,7 @@ specs/
     init.sh              ← Setup AI tool configs
   <feature-slug>/
     specs.md             ← Technical specification
-    requirements.md      ← Acceptance criteria
+    requirements.md      ← Implementation acceptance checklist
     prompt.md            ← Implementation prompt
 ```
 
@@ -59,7 +60,7 @@ bash ./specs/.devx/init.sh
 If you want execute permissions as well:
 
 ```bash
-chmod +x ./specs/.devx/init.sh && ./specs/.devx/init.sh
+  chmod +x ./specs/.devx/init.sh && ./specs/.devx/init.sh
 ```
 
 The script lists supported AI tools, lets you choose one, and creates only that tool's config files.
